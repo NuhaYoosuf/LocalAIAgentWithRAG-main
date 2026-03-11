@@ -1,6 +1,19 @@
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
 from vector import retriever
+
+app = FastAPI(title="SEUSL Chatbot API", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 model = OllamaLLM(model="llama3")
 
@@ -26,24 +39,24 @@ Answer:
 prompt = ChatPromptTemplate.from_template(template)
 chain = prompt | model
 
-print("=" * 60)
-print("  Welcome to SEUSL University Chatbot")
-print("  South Eastern University of Sri Lanka")
-print("=" * 60)
-print("  Type your question and press Enter.")
-print("  Type 'q' to quit.")
-print("=" * 60)
 
-while True:
-    print("\n")
-    question = input("You: ").strip()
-    if not question:
-        continue
-    if question.lower() == "q":
-        print("Thank you for using SEUSL Chatbot. Goodbye!")
-        break
+class ChatRequest(BaseModel):
+    message: str
 
-    context_docs = retriever.invoke(question)
+
+@app.get("/")
+async def root():
+    return {"status": "SEUSL Chatbot API is running", "version": "1.0.0"}
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest):
+    context_docs = retriever.invoke(request.message)
     context = "\n\n".join([doc.page_content for doc in context_docs])
-    result = chain.invoke({"context": context, "question": question})
-    print(f"\nSEUSL Bot: {result}")
+    sources = list({
+        doc.metadata.get("source", "").replace("\\", "/").split("/")[-1]
+        for doc in context_docs
+        if doc.metadata.get("source")
+    })
+    response = chain.invoke({"context": context, "question": request.message})
+    return {"response": response, "sources": sources}

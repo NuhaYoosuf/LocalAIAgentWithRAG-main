@@ -1,4 +1,7 @@
 langchain
 langchain-ollama
 langchain-chroma
-pandas
+langchain-community
+unstructured
+fastapi
+uvicorn[standard]

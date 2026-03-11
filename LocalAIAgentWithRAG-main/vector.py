@@ -1,37 +1,40 @@
 from langchain_ollama import OllamaEmbeddings
 from langchain_chroma import Chroma
-from langchain_core.documents import Document
+from langchain_community.document_loaders import DirectoryLoader, TextLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
-import pandas as pd
 
-df = pd.read_csv("realistic_restaurant_reviews.csv")
 embeddings = OllamaEmbeddings(model="mxbai-embed-large")
 
-db_location = "./chrome_langchain_db"
+db_location = "./seusl_vector_db_v5"
 add_documents = not os.path.exists(db_location)
 
 if add_documents:
-    documents = []
-    ids = []
-    
-    for i, row in df.iterrows():
-        document = Document(
-            page_content=row["Title"] + " " + row["Review"],
-            metadata={"rating": row["Rating"], "date": row["Date"]},
-            id=str(i)
-        )
-        ids.append(str(i))
-        documents.append(document)
-        
+    print("Loading and indexing university documents...")
+    loader = DirectoryLoader(
+        "./data",
+        glob="*.txt",
+        loader_cls=TextLoader,
+        loader_kwargs={"encoding": "utf-8"}
+    )
+    raw_documents = loader.load()
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100
+    )
+    documents = splitter.split_documents(raw_documents)
+
 vector_store = Chroma(
-    collection_name="restaurant_reviews",
+    collection_name="seusl_knowledge_base",
     persist_directory=db_location,
     embedding_function=embeddings
 )
 
 if add_documents:
-    vector_store.add_documents(documents=documents, ids=ids)
-    
+    vector_store.add_documents(documents=documents)
+    print(f"Indexed {len(documents)} document chunks into the knowledge base.")
+
 retriever = vector_store.as_retriever(
-    search_kwargs={"k": 5}
+    search_kwargs={"k": 8}
 )
