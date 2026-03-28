@@ -5,3 +5,7 @@ langchain-community
 unstructured
 fastapi
 uvicorn[standard]
+requests
+beautifulsoup4
+pdfplumber
+PyPDF2
